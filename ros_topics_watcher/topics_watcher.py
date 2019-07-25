@@ -7,7 +7,10 @@
 import argparse
 import py_trees.console as console
 import rospy
+import rostopic
 import sys
+
+from cPickle import dumps
 
 
 ##############################################################################
@@ -54,9 +57,39 @@ def command_line_argument_parser(formatted_for_sphinx=True):
 # Helpers
 ##############################################################################
 
+class CachedSubscriber(object):
+    def __init__(self):
+        self.cached_pickle = {}
+
+    def _is_changed(self, msg):
+        current_pickle = dumps(msg, -1)
+        if current_pickle == self.cached_pickle:
+            return False
+
+        self.cached_pickle = current_pickle
+        return True
+
+    def callback(self, msg):
+        if self._is_changed(msg):
+            print msg
+
+
 def handle_args(args):
     print args
-    print "handle me"
+    if args.list_topics is True:
+        print rostopic._rostopic_list(None, publishers_only=True)
+    elif args.topics:
+        topic = args.topics[0]
+        print topic
+
+        rospy.init_node('ros_topics_watcher', anonymous=True)
+
+        cached_sub = CachedSubscriber()
+        msg_class, real_topic, _ = rostopic.get_topic_class(topic)
+        sub = rospy.Subscriber(real_topic, msg_class, cached_sub.callback)
+
+        while not rospy.is_shutdown():
+            rospy.spin()
 
 
 ##############################################################################
