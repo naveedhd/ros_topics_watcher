@@ -1,0 +1,22 @@
+<package format="2">
+  <name>ros_topics_watcher</name>
+  <version>0.1.0</version>
+  <description>ROS topics watcher</description>
+
+  <maintainer email="naveedhd@gmail.com">Naveed Usmani</maintainer>
+
+  <license>TODO</license>
+
+  <url type="repository">https://github.com/naveedhd/ros_topics_watcher</url>
+  <url type="repository">https://github.com/naveedhd/ros_topics_watcher</url>
+  <url type="bugtracker">https://github.com/naveedhd/ros_topics_watcher/issues</url>
+
+  <author>Naveed Usmani</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>python-setuptools</build_depend>
+
+  <exec_depend>rospy</exec_depend>
+
+</package>
