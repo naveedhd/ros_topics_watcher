@@ -5,11 +5,12 @@
 ##############################################################################
 
 import argparse
-import rospy
-import rostopic
+import socket
 import sys
 
-from cPickle import dumps
+import rospy
+import rostopic
+import rosgraph
 
 from . import console
 
@@ -51,21 +52,37 @@ def command_line_argument_parser():
 # Helpers
 ##############################################################################
 
-class CachedSubscriber(object):
-    def __init__(self):
-        self.cached_pickle = {}
+class CallbackDiffEcho(rostopic.CallbackEcho):
+    def __init__(self, topic):
+        super(CallbackDiffEcho, self).__init__(topic, None)
+        self.last_data = None
+        self.filter_fn = self.filter_func
 
-    def _is_changed(self, msg):
-        current_pickle = dumps(msg, -1)
-        if current_pickle == self.cached_pickle:
+    def filter_func(self, data):
+        eval_data = self.msg_eval(data) if self.msg_eval is not None else data
+        if eval_data == self.last_data:
             return False
 
-        self.cached_pickle = current_pickle
+        self.last_data = eval_data
         return True
 
-    def callback(self, msg):
-        if self._is_changed(msg):
-            print msg
+    def custom_strify_message(self, val,
+                              indent='',
+                              time_offset=None,
+                              current_time=None,
+                              field_filter=None,
+                              type_information=None,
+                              fixed_numeric_width=None,
+                              value_transform=None):
+        return self.topic + ': ' + \
+                 super(CallbackDiffEcho, self).custom_strify_message(val,
+                                                                     indent,
+                                                                     time_offset,
+                                                                     current_time,
+                                                                     field_filter,
+                                                                     type_information,
+                                                                     fixed_numeric_width,
+                                                                     value_transform)
 
 
 def handle_args(args):
@@ -74,17 +91,16 @@ def handle_args(args):
         return
 
     if args.topics:
+        # TODO: take all topics
         topic = args.topics[0]
-        print topic
 
-        rospy.init_node('ros_topics_watcher', anonymous=True)
+        # resolves namespace .. in this case making it global
+        topic = rosgraph.names.script_resolve_name('ros-topics-watcher', topic)
 
-        cached_sub = CachedSubscriber()
-        msg_class, real_topic, _ = rostopic.get_topic_class(topic)
-        sub = rospy.Subscriber(real_topic, msg_class, cached_sub.callback)
-
-        while not rospy.is_shutdown():
-            rospy.spin()
+        try:
+            rostopic._rostopic_echo(topic, CallbackDiffEcho(topic))
+        except socket.error:
+            sys.stderr.write("Network communication failed. Most likely failed to communicate with master.\n")
 
 
 ##############################################################################
