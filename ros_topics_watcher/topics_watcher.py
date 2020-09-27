@@ -19,7 +19,7 @@ from . import console
 ##############################################################################
 
 def description():
-    examples = ["--list-topics", "access_point odom/pose/pose/position"]
+    examples = ["--list-published-topics", "access_point odom/pose/pose/position"]
     script_name = "ros-topics-watcher"
 
     banner_line = console.green + "*" * 79 + "\n" + console.reset
@@ -40,8 +40,8 @@ def description():
 def command_line_argument_parser():
     parser = argparse.ArgumentParser(description=description(),
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-l', '--list-topics', action='store_true',
-                        default=None, help='list the topics')
+    parser.add_argument('-l', '--list-published-topics', action='store_true',
+                        default=False, help='Prints the list of published topics')
     parser.add_argument('topics', nargs=argparse.REMAINDER, default=None,
                         help='space separated list of topics to watch')
     return parser
@@ -69,10 +69,11 @@ class CachedSubscriber(object):
 
 
 def handle_args(args):
-    print args
-    if args.list_topics is True:
-        print rostopic._rostopic_list(None, publishers_only=True)
-    elif args.topics:
+    if args.list_published_topics:
+        rostopic._rostopic_list(None, verbose=True, publishers_only=True)
+        return
+
+    if args.topics:
         topic = args.topics[0]
         print topic
 
