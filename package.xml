@@ -17,7 +17,9 @@
 
   <build_depend>python-setuptools</build_depend>
 
-  <exec_depend>rostopic</exec_depend>
+  <exec_depend>rosgraph</exec_depend>
+  <exec_depend>roslib</exec_depend>
   <exec_depend>rospy</exec_depend>
+  <exec_depend>rostopic</exec_depend>
 
 </package>

@@ -5,12 +5,13 @@
 ##############################################################################
 
 import argparse
-import socket
 import sys
+import time
 
+import rosgraph
+import roslib
 import rospy
 import rostopic
-import rosgraph
 
 from . import console
 
@@ -90,17 +91,63 @@ def handle_args(args):
         rostopic._rostopic_list(None, verbose=True, publishers_only=True)
         return
 
-    if args.topics:
-        # TODO: take all topics
-        topic = args.topics[0]
+    if not args.topics:
+        return
 
+    rostopic._check_master()
+    node_name = 'ros_topics_watcher'
+    rospy.init_node(node_name, anonymous=True)
+
+    for topic in args.topics:
         # resolves namespace .. in this case making it global
-        topic = rosgraph.names.script_resolve_name('ros-topics-watcher', topic)
+        topic = rosgraph.names.script_resolve_name(node_name, topic)
 
-        try:
-            rostopic._rostopic_echo(topic, CallbackDiffEcho(topic))
-        except socket.error:
-            sys.stderr.write("Network communication failed. Most likely failed to communicate with master.\n")
+        msg_class, real_topic, msg_eval = rostopic.get_topic_class(topic, blocking=True)
+        if msg_class is None:
+            # occurs on ctrl-C
+            continue
+
+        callback_echo = CallbackDiffEcho(topic)
+        callback_echo.msg_eval = msg_eval
+
+        # extract type information for submessages
+        type_information = None
+        if len(topic) > len(real_topic):
+            subtopic = topic[len(real_topic):]
+            subtopic = subtopic.strip('/')
+            if subtopic:
+                fields = subtopic.split('/')
+                submsg_class = msg_class
+                while fields:
+                    field = fields[0].split('[')[0]
+                    del fields[0]
+                    index = submsg_class.__slots__.index(field)
+                    type_information = submsg_class._slot_types[index]
+                    if fields:
+                        submsg_class = roslib.message.get_message_class(type_information.split('[', 1)[0])
+                        if not submsg_class:
+                            raise rostopic.ROSTopicException("Cannot load message class for [%s]. Are your messages built?" % type_information)
+
+        use_sim_time = rospy.get_param('/use_sim_time', False)
+        sub = rospy.Subscriber(real_topic, msg_class, callback_echo.callback, {'topic': topic, 'type_information': type_information})
+
+        # TODO: this will block for next topics.. solve this
+        if use_sim_time:
+            # #2950: print warning if nothing received for two seconds
+
+            timeout_t = time.time() + 2.
+            while time.time() < timeout_t and \
+                    callback_echo.count == 0 and \
+                    not rospy.is_shutdown() and \
+                    not callback_echo.done:
+                rostopic._sleep(0.1)
+
+            if callback_echo.count == 0 and \
+                    not rospy.is_shutdown() and \
+                    not callback_echo.done:
+                sys.stderr.write("WARNING: no messages received and simulated time is active.\nIs /clock being published?\n")
+
+    rospy.spin()
 
 
 ##############################################################################
