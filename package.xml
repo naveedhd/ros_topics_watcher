@@ -17,6 +17,7 @@
 
   <build_depend>python-setuptools</build_depend>
 
+  <exec_depend>rostopic</exec_depend>
   <exec_depend>rospy</exec_depend>
 
 </package>

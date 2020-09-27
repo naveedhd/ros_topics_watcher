@@ -5,12 +5,13 @@
 ##############################################################################
 
 import argparse
-import py_trees.console as console
 import rospy
 import rostopic
 import sys
 
 from cPickle import dumps
+
+from . import console
 
 
 ##############################################################################
@@ -36,15 +37,8 @@ def description():
     return s
 
 
-def epilog():
-    return console.cyan + "And his noodly appendage reached forth to tickle the blessed...\n" + console.reset
-
-
-def command_line_argument_parser(formatted_for_sphinx=True):
-    # formatted_for_sphinx is an ugly hack to make sure sphinx does not pick up the colour codes.
-    # works only by assuming that the only callee who calls it without setting the arg is sphinx's argparse
+def command_line_argument_parser():
     parser = argparse.ArgumentParser(description=description(),
-                                     epilog=epilog(),
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-l', '--list-topics', action='store_true',
                         default=None, help='list the topics')
