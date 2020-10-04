@@ -5,22 +5,22 @@ Inspired by [py-trees-blackboard-watcher](https://py-trees-ros.readthedocs.io/en
 ## Examples
 
 ```
->>> ros-topics-watcher -l
+$ ros-topics-watcher -l
 
 Published topics:
  * /foo [std_msgs/Header] 1 publisher
  * /bar [std_msgs/Header] 1 publisher
  * /rosout_agg [rosgraph_msgs/Log] 1 publisher
 
->> ros-topics-watcher /foo/seq
+
+
+$ ros-topics-watcher /foo/seq
 /foo/seq: 0
 ---
 
->> ros-topics-watcher /foo/seq /bar/stamp/nsecs
-/foo/seq: 0
----
 
->> ros-topics-watcher /foo/seq /bar/stamp/nsecs
+
+$ ros-topics-watcher /foo/seq /bar/stamp/nsecs
 /foo/seq: 0
 ---
 /bar/stamp/nsecs: 34739017
@@ -37,5 +37,7 @@ Published topics:
 ---
 /bar/stamp/nsecs: 634763956
 ---
+
+
 
 ```
