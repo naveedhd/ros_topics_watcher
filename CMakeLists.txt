@@ -14,3 +14,11 @@ find_package(catkin REQUIRED)
 catkin_python_setup()
 
 catkin_package()
+
+##############################################################################
+# Tests
+##############################################################################
+
+if (CATKIN_ENABLE_TESTING)
+  add_subdirectory(tests)
+endif()

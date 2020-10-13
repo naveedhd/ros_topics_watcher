@@ -1,0 +1,8 @@
+<launch>
+
+  <node name="foo_publisher" type="rostopic" pkg="rostopic"
+        args="pub /foo std_msgs/ColorRGBA {} -r 10" />
+
+  <test test-name="test_get_topic_class" type="test_get_topic_class.py" pkg="ros_topics_watcher" />
+
+</launch>
