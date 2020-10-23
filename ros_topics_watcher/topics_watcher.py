@@ -5,6 +5,8 @@
 ##############################################################################
 
 import argparse
+import operator
+import re
 import sys
 import time
 
@@ -44,7 +46,7 @@ def command_line_argument_parser():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-l', '--list-published-topics', action='store_true',
                         default=False, help='Prints the list of published topics')
-    parser.add_argument('topics', nargs=argparse.REMAINDER, default=None,
+    parser.add_argument('topics', nargs='+', default=None,
                         help='space separated list of topics to watch')
     return parser
 
@@ -57,14 +59,18 @@ class CallbackDiffEcho(rostopic.CallbackEcho):
     def __init__(self, topic):
         super(CallbackDiffEcho, self).__init__(topic, None)
         self.last_data = None
+
+        # TODO: capture original filter func too
         self.filter_fn = self.filter_func
 
     def filter_func(self, data):
-        eval_data = self.msg_eval(data) if self.msg_eval is not None else data
-        if eval_data == self.last_data:
+        if self.msg_eval is not None:
+            data = self.msg_eval(data)
+
+        if data == self.last_data:
             return False
 
-        self.last_data = eval_data
+        self.last_data = data
         return True
 
     def custom_strify_message(self, val,
@@ -86,6 +92,39 @@ class CallbackDiffEcho(rostopic.CallbackEcho):
                                                                      value_transform)
 
 
+def attr_eval(msg_eval, attrs):
+    attr_getter = operator.attrgetter(*attrs)
+
+    def func(data):
+        return attr_getter(data) if msg_eval is None else attr_getter(msg_eval(data))
+
+    return func
+
+
+def extract_attrs(topic_with_attrs):
+    if not topic_with_attrs.endswith(']'):
+        return topic_with_attrs, None
+
+    last_opening_bracket = topic_with_attrs.rfind('[')
+    if last_opening_bracket == -1:
+        return topic_with_attrs, None
+
+    extract = re.sub(r"^.*\[(.*?)\][^\[]*$", r"\g<1>", topic_with_attrs)
+    if not extract:
+        return topic_with_attrs, None
+
+    # check if the value inside brackets can be handled by rostopic (array slicing)
+    try:
+        _ = rostopic._get_array_index_or_slice_object(extract)
+        return topic_with_attrs, None
+    except AssertionError:
+        pass
+
+    # check if they are string?
+
+    return topic_with_attrs[:last_opening_bracket], extract.split(',')
+
+
 def handle_args(args):
     if args.list_published_topics:
         rostopic._rostopic_list(None, verbose=True, publishers_only=True)
@@ -102,13 +141,16 @@ def handle_args(args):
         # resolves namespace .. in this case making it global
         topic = rosgraph.names.script_resolve_name(node_name, topic)
 
+        # split attributes if any
+        topic, attrs = extract_attrs(topic)
+
+        # TODO: remove blocking
         msg_class, real_topic, msg_eval = rostopic.get_topic_class(topic, blocking=True)
         if msg_class is None:
-            # occurs on ctrl-C
             continue
 
         callback_echo = CallbackDiffEcho(topic)
-        callback_echo.msg_eval = msg_eval
+        callback_echo.msg_eval = msg_eval if attrs is None else attr_eval(msg_eval, attrs)
 
         # extract type information for submessages
         type_information = None
