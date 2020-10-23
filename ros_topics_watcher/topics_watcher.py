@@ -9,6 +9,7 @@ import operator
 import re
 import sys
 import time
+import yaml
 
 import rosgraph
 import roslib
@@ -101,6 +102,22 @@ def attr_eval(msg_eval, attrs):
     return func
 
 
+def value_transform(attrs):
+    attrs = attrs
+
+    class DictZipper(object):
+        def __init__(self, attrs, vals):
+            self.dct = dict(zip(attrs, vals))
+
+        def __str__(self):
+            return "\n" + yaml.dump(self.dct, allow_unicode=True, default_flow_style=False)
+
+    def func(vals, _):
+        return DictZipper(attrs, vals)
+
+    return func
+
+
 def extract_attrs(topic_with_attrs):
     if not topic_with_attrs.endswith(']'):
         return topic_with_attrs, None
@@ -120,7 +137,17 @@ def extract_attrs(topic_with_attrs):
     except AssertionError:
         pass
 
-    # check if they are string?
+    # or a single field
+    if ',' not in extract:
+        # we just transform into a field that rostopic can resolve
+        topic = topic_with_attrs[:last_opening_bracket]
+        if not topic.endswith('/'):
+            topic += '/'
+        topic += extract
+
+        return topic, None
+
+    # check if they are valid attribute names?
 
     return topic_with_attrs[:last_opening_bracket], extract.split(',')
 
@@ -144,13 +171,20 @@ def handle_args(args):
         # split attributes if any
         topic, attrs = extract_attrs(topic)
 
+        # trailing '/' doesn't work well with rostopic
+        topic = topic.rstrip('/')
+
         # TODO: remove blocking
         msg_class, real_topic, msg_eval = rostopic.get_topic_class(topic, blocking=True)
         if msg_class is None:
             continue
 
         callback_echo = CallbackDiffEcho(topic)
-        callback_echo.msg_eval = msg_eval if attrs is None else attr_eval(msg_eval, attrs)
+        if attrs is not None:
+            callback_echo.msg_eval = attr_eval(msg_eval, attrs)
+            callback_echo.value_transform = value_transform(attrs)
+        else:
+            callback_echo.msg_eval = msg_eval
 
         # extract type information for submessages
         type_information = None
@@ -168,10 +202,12 @@ def handle_args(args):
                     if fields:
                         submsg_class = roslib.message.get_message_class(type_information.split('[', 1)[0])
                         if not submsg_class:
-                            raise rostopic.ROSTopicException("Cannot load message class for [%s]. Are your messages built?" % type_information)
+                            raise rostopic.ROSTopicException(
+                                    "Cannot load message class for [%s]. Are your messages built?" % type_information)
 
         use_sim_time = rospy.get_param('/use_sim_time', False)
-        sub = rospy.Subscriber(real_topic, msg_class, callback_echo.callback, {'topic': topic, 'type_information': type_information})
+        _ = rospy.Subscriber(real_topic, msg_class, callback_echo.callback,
+                             {'topic': topic, 'type_information': type_information})
 
         # TODO: this will block for next topics.. solve this
         if use_sim_time:
@@ -187,7 +223,8 @@ def handle_args(args):
             if callback_echo.count == 0 and \
                     not rospy.is_shutdown() and \
                     not callback_echo.done:
-                sys.stderr.write("WARNING: no messages received and simulated time is active.\nIs /clock being published?\n")
+                sys.stderr.write(
+                    "WARNING: no messages received and simulated time is active.\nIs /clock being published?\n")
 
     rospy.spin()
 
