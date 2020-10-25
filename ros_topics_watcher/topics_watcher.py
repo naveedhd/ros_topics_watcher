@@ -22,7 +22,11 @@ import rostopic
 ##############################################################################
 
 def description():
-    examples = ["--list-published-topics", "access_point odom/pose/pose/position"]
+    examples = [
+        "--list-published-topics",
+        "access_point odom/pose/pose/position",
+        "color[r,g]",
+        "header[seq,stamp.secs]"]
     script_name = "ros-topics-watcher"
 
     banner_line = "*" * 79 + "\n"
@@ -46,6 +50,7 @@ def command_line_argument_parser():
                         default=False, help='Prints the list of published topics')
     parser.add_argument('topics', nargs='+', default=None,
                         help='space separated list of topics to watch')
+
     return parser
 
 
