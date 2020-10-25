@@ -54,12 +54,15 @@ def command_line_argument_parser():
 ##############################################################################
 
 class CallbackDiffEcho(rostopic.CallbackEcho):
-    def __init__(self, topic):
+    def __init__(self, topic, attrs):
         super(CallbackDiffEcho, self).__init__(topic, None)
         self.last_data = None
 
         # TODO: capture original filter func too
         self.filter_fn = self.filter_func
+
+        attrs_log = '[' + ', '.join(attrs) + ']' if attrs else ''
+        self.topic_log = '{}{}: '.format(topic, attrs_log)
 
     def filter_func(self, data):
         if self.msg_eval is not None:
@@ -71,23 +74,10 @@ class CallbackDiffEcho(rostopic.CallbackEcho):
         self.last_data = data
         return True
 
-    def custom_strify_message(self, val,
-                              indent='',
-                              time_offset=None,
-                              current_time=None,
-                              field_filter=None,
-                              type_information=None,
-                              fixed_numeric_width=None,
-                              value_transform=None):
-        return self.topic + ': ' + \
-                 super(CallbackDiffEcho, self).custom_strify_message(val,
-                                                                     indent,
-                                                                     time_offset,
-                                                                     current_time,
-                                                                     field_filter,
-                                                                     type_information,
-                                                                     fixed_numeric_width,
-                                                                     value_transform)
+    def custom_strify_message(self, *args, **kwargs):
+        # TODO: space between tag and msg for multiline msg
+        return self.topic_log + \
+                 super(CallbackDiffEcho, self).custom_strify_message(*args, **kwargs)
 
 
 def attr_eval(msg_eval, attrs):
@@ -107,6 +97,7 @@ def value_transform(attrs):
             self.dct = dict(zip(attrs, vals))
 
         def __str__(self):
+            # TODO: fix things which doesnt work well with yaml repr e.g. rosTime
             return "\n" + yaml.dump(self.dct, allow_unicode=True, default_flow_style=False)
 
     def func(vals, _):
@@ -164,7 +155,7 @@ def spawn_subscriber(topic):
     if msg_class is None:
         return
 
-    callback_echo = CallbackDiffEcho(topic)
+    callback_echo = CallbackDiffEcho(topic, attrs)
     if attrs is not None:
         callback_echo.msg_eval = attr_eval(msg_eval, attrs)
         callback_echo.value_transform = value_transform(attrs)
