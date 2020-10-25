@@ -8,6 +8,7 @@ import argparse
 import operator
 import re
 import sys
+import threading
 import yaml
 
 import rosgraph
@@ -148,6 +149,51 @@ def extract_attrs(topic_with_attrs):
     return topic_with_attrs[:last_opening_bracket], extract.split(',')
 
 
+def spawn_subscriber(topic):
+    # resolves namespace .. in this case making it global
+    topic = rosgraph.names.script_resolve_name('', topic)
+
+    # split attributes if any
+    topic, attrs = extract_attrs(topic)
+
+    # trailing '/' doesn't work well with rostopic
+    topic = topic.rstrip('/')
+
+    # TODO: remove blocking
+    msg_class, real_topic, msg_eval = rostopic.get_topic_class(topic, blocking=True)
+    if msg_class is None:
+        return
+
+    callback_echo = CallbackDiffEcho(topic)
+    if attrs is not None:
+        callback_echo.msg_eval = attr_eval(msg_eval, attrs)
+        callback_echo.value_transform = value_transform(attrs)
+    else:
+        callback_echo.msg_eval = msg_eval
+
+    # extract type information for submessages
+    type_information = None
+    if len(topic) > len(real_topic):
+        subtopic = topic[len(real_topic):]
+        subtopic = subtopic.strip('/')
+        if subtopic:
+            fields = subtopic.split('/')
+            submsg_class = msg_class
+            while fields:
+                field = fields[0].split('[')[0]
+                del fields[0]
+                index = submsg_class.__slots__.index(field)
+                type_information = submsg_class._slot_types[index]
+                if fields:
+                    submsg_class = roslib.message.get_message_class(type_information.split('[', 1)[0])
+                    if not submsg_class:
+                        raise rostopic.ROSTopicException(
+                                "Cannot load message class for [%s]. Are your messages built?" % type_information)
+
+    rospy.Subscriber(real_topic, msg_class, callback_echo.callback,
+                     {'topic': topic, 'type_information': type_information})
+
+
 def handle_args(args):
     if args.list_published_topics:
         rostopic._rostopic_list(None, verbose=True, publishers_only=True)
@@ -157,52 +203,11 @@ def handle_args(args):
         return
 
     rostopic._check_master()
-    node_name = 'ros_topics_watcher'
-    rospy.init_node(node_name, anonymous=True)
+
+    rospy.init_node('ros_topics_watcher', anonymous=True)
 
     for topic in args.topics:
-        # resolves namespace .. in this case making it global
-        topic = rosgraph.names.script_resolve_name(node_name, topic)
-
-        # split attributes if any
-        topic, attrs = extract_attrs(topic)
-
-        # trailing '/' doesn't work well with rostopic
-        topic = topic.rstrip('/')
-
-        # TODO: remove blocking
-        msg_class, real_topic, msg_eval = rostopic.get_topic_class(topic, blocking=True)
-        if msg_class is None:
-            continue
-
-        callback_echo = CallbackDiffEcho(topic)
-        if attrs is not None:
-            callback_echo.msg_eval = attr_eval(msg_eval, attrs)
-            callback_echo.value_transform = value_transform(attrs)
-        else:
-            callback_echo.msg_eval = msg_eval
-
-        # extract type information for submessages
-        type_information = None
-        if len(topic) > len(real_topic):
-            subtopic = topic[len(real_topic):]
-            subtopic = subtopic.strip('/')
-            if subtopic:
-                fields = subtopic.split('/')
-                submsg_class = msg_class
-                while fields:
-                    field = fields[0].split('[')[0]
-                    del fields[0]
-                    index = submsg_class.__slots__.index(field)
-                    type_information = submsg_class._slot_types[index]
-                    if fields:
-                        submsg_class = roslib.message.get_message_class(type_information.split('[', 1)[0])
-                        if not submsg_class:
-                            raise rostopic.ROSTopicException(
-                                    "Cannot load message class for [%s]. Are your messages built?" % type_information)
-
-        _ = rospy.Subscriber(real_topic, msg_class, callback_echo.callback,
-                             {'topic': topic, 'type_information': type_information})
+        threading.Thread(target=spawn_subscriber, args=(topic,)).start()
 
     rospy.spin()
 
