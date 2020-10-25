@@ -16,8 +16,6 @@ import roslib
 import rospy
 import rostopic
 
-from . import console
-
 
 ##############################################################################
 # Argument Parsing
@@ -27,16 +25,15 @@ def description():
     examples = ["--list-published-topics", "access_point odom/pose/pose/position"]
     script_name = "ros-topics-watcher"
 
-    banner_line = console.green + "*" * 79 + "\n" + console.reset
+    banner_line = "*" * 79 + "\n"
     s = "\n"
     s += banner_line
-    s += console.bold_white + \
-        "ROS Topics Watcher".center(79) + "\n" + console.reset
+    s += "ROS Topics Watcher".center(79) + "\n"
     s += banner_line
     s += "\n"
-    s += console.bold + "Examples" + console.reset + "\n\n"
-    s += '\n'.join(["    $ " + console.cyan + script_name + console.yellow +
-                    " {0}".format(example_args) + console.reset for example_args in examples])
+    s += "Examples" + "\n\n"
+    s += '\n'.join(["    $ " + script_name +
+                    " {0}".format(example_args) for example_args in examples])
     s += "\n\n"
     s += banner_line
     return s
