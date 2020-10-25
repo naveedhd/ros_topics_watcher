@@ -48,7 +48,7 @@ def command_line_argument_parser():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-l', '--list-published-topics', action='store_true',
                         default=False, help='Prints the list of published topics')
-    parser.add_argument('topics', nargs='+', default=None,
+    parser.add_argument('topics', nargs=argparse.REMAINDER, default=None,
                         help='space separated list of topics to watch')
 
     return parser
