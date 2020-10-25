@@ -140,7 +140,7 @@ def extract_attrs(topic_with_attrs):
         topic = topic_with_attrs[:last_opening_bracket]
         if not topic.endswith('/'):
             topic += '/'
-        topic += extract
+        topic += extract.replace('.', '/')  # rostopic parses fields using '/'
 
         return topic, None
 
