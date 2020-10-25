@@ -8,7 +8,6 @@ import argparse
 import operator
 import re
 import sys
-import time
 import yaml
 
 import rosgraph
@@ -202,26 +201,8 @@ def handle_args(args):
                             raise rostopic.ROSTopicException(
                                     "Cannot load message class for [%s]. Are your messages built?" % type_information)
 
-        use_sim_time = rospy.get_param('/use_sim_time', False)
         _ = rospy.Subscriber(real_topic, msg_class, callback_echo.callback,
                              {'topic': topic, 'type_information': type_information})
-
-        # TODO: this will block for next topics.. solve this
-        if use_sim_time:
-            # #2950: print warning if nothing received for two seconds
-
-            timeout_t = time.time() + 2.
-            while time.time() < timeout_t and \
-                    callback_echo.count == 0 and \
-                    not rospy.is_shutdown() and \
-                    not callback_echo.done:
-                rostopic._sleep(0.1)
-
-            if callback_echo.count == 0 and \
-                    not rospy.is_shutdown() and \
-                    not callback_echo.done:
-                sys.stderr.write(
-                    "WARNING: no messages received and simulated time is active.\nIs /clock being published?\n")
 
     rospy.spin()
 
